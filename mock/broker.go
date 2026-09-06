@@ -6,12 +6,12 @@ package mock
 import (
 	"sync"
 
-	"github.com/tinywasm/events"
+	"webtyp.com/events"
 )
 
 // Broker delivers synchronously, in subscription order, to every Subscriber
 // registered for an Event's Topic at the moment Publish runs. It never crosses a
-// process boundary — that is github.com/tinywasm/sse's job.
+// process boundary — that is webtyp.com/sse's job.
 type Broker struct {
 	mu   sync.Mutex
 	subs map[string][]events.Handler

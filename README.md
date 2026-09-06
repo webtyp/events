@@ -15,7 +15,7 @@ module's own ad-hoc interface.
 ## Quick Start
 
 ```go
-import "github.com/tinywasm/events"
+import "webtyp.com/events"
 
 const TopicItemCreated = "catalog.item.created"
 
@@ -65,7 +65,7 @@ declared it needs.
 
 An event's `Payload` travels as the concrete Go value the publisher built. An in-process broker
 (`mock.Broker`) delivers it as-is — no serialization. A broker that crosses a real wire
-(`github.com/tinywasm/sse`, pushing to a browser) encodes `Payload` via its own `EncodeFields`
+(`webtyp.com/sse`, pushing to a browser) encodes `Payload` via its own `EncodeFields`
 when it needs to; that is the broker's concern, never the contract's or the module's.
 
 No `any` in the public API surface beyond the one Go interface value (`model.Encodable`) every

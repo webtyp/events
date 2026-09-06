@@ -10,11 +10,11 @@
 //
 // This package is the contract both sides depend on instead. A module imports
 // events + model — never a concrete broker (an in-process broker for module-to-module
-// delivery, github.com/tinywasm/sse for push to the browser) — and the composition
+// delivery, webtyp.com/sse for push to the browser) — and the composition
 // root injects the Broker.
 package events
 
-import "github.com/tinywasm/model"
+import "webtyp.com/model"
 
 // Event is one message on a topic: a name plus a typed payload — never `any`.
 // Payload travels as the concrete Go value the publisher built. An in-process
@@ -51,8 +51,8 @@ type Subscriber interface {
 }
 
 // Broker is the full contract a composition root wires in: publish and subscribe
-// together. Implementations: github.com/tinywasm/events/mock (in-process, for
-// module-to-module delivery and tests) and github.com/tinywasm/sse (push to the
+// together. Implementations: webtyp.com/events/mock (in-process, for
+// module-to-module delivery and tests) and webtyp.com/sse (push to the
 // browser).
 type Broker interface {
 	Publisher

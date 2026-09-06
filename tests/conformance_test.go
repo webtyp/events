@@ -3,9 +3,9 @@ package events_test
 import (
 	"testing"
 
-	"github.com/tinywasm/events"
-	"github.com/tinywasm/events/conformance"
-	"github.com/tinywasm/events/mock"
+	"webtyp.com/events"
+	"webtyp.com/events/conformance"
+	"webtyp.com/events/mock"
 )
 
 // TestMockConformance holds the reference in-process broker to the same contract

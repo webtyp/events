@@ -1,7 +1,7 @@
 // Package conformance is the executable contract of events.Broker.
 //
 // The interface states the SIGNATURES; this package states the BEHAVIOUR — the same
-// role github.com/tinywasm/router/conformance plays for router.Router. Two brokers can
+// role webtyp.com/router/conformance plays for router.Router. Two brokers can
 // satisfy events.Broker and disagree on what matters (does a subscriber to topic A see
 // an event published on topic B? does a second subscriber on the same topic see
 // anything at all?). That has to become something that goes red, not folklore.
@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tinywasm/events"
-	"github.com/tinywasm/model"
+	"webtyp.com/events"
+	"webtyp.com/model"
 )
 
 // TopicA and TopicB are the two topics the suite drives its cases with.

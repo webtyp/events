@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tinywasm/events"
-	"github.com/tinywasm/events/mock"
-	"github.com/tinywasm/model"
+	"webtyp.com/events"
+	"webtyp.com/events/mock"
+	"webtyp.com/model"
 )
 
 // itemCreated mimics a domain module's own event payload — e.g. item_catalog
