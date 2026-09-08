@@ -3,8 +3,9 @@ PLAN: "fix(events/mock): map-free in-process Broker — zero map in the WASM tre
 TAG: v0.0.4
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 1957865850781592957
+PR: https://github.com/webtyp/events/pull/1
 ---
 
 # PLAN — `events/mock` Broker sin `map`
