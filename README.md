@@ -60,6 +60,28 @@ declared it needs.
 - **`conformance`**: `conformance.Run(t, conformance.Factory{New: ...})` — the executable
   behavior contract every `Broker` must pass, the same role `router/conformance` plays for
   `router.Router`.
+- **`Fanout`**: `[]Publisher`, itself a `Publisher` — publishes to every entry in the slice.
+
+## Two audiences
+
+A server binary usually has **two** audiences for the same event: the other modules in its own
+process (`mock.Broker`), and the browser (`webtyp.com/sse`). A module still takes exactly one
+`Publisher` — compose the two with `Fanout`:
+
+```go
+pub := events.Fanout{broker, sse.Publisher{Server: sseSrv}}
+
+mod, err := somemodule.New(db, somemodule.Deps{
+    Publisher:  pub,     // reaches both audiences
+    Subscriber: broker,  // in-proc only — SSE is one-way server→browser and
+})                       // cannot deliver to an in-process handler
+```
+
+**`Subscriber` is always the broker.** That asymmetry is the thing to get right: SSE only pushes
+outward, so nothing can subscribe through it.
+
+A nil entry in a `Fanout` is skipped, and a nil `Fanout` is a valid no-op `Publisher` — a
+composition root can build one unconditionally, transport included or not.
 
 ## Design
 

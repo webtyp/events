@@ -58,3 +58,27 @@ type Broker interface {
 	Publisher
 	Subscriber
 }
+
+// Fanout publishes one Event to every Publisher it holds, in order. It is
+// itself a Publisher, so a module still takes exactly one.
+//
+// It exists because a server binary has two audiences for the same event: the
+// modules in its own process (mock.Broker) and the browser (webtyp.com/sse).
+// Without it a module would need two Publisher fields — it would have to know
+// there are two audiences, which is the coupling this package removes.
+//
+// Delivery follows the Publisher contract: fire-and-forget, no ordering or
+// delivery promise beyond "every Publisher in the slice is called". A nil
+// entry is skipped, so an optional transport can be composed without a guard
+// at the call site.
+type Fanout []Publisher
+
+func (f Fanout) Publish(e Event) {
+	for _, p := range f {
+		if p != nil {
+			p.Publish(e)
+		}
+	}
+}
+
+var _ Publisher = Fanout(nil)
