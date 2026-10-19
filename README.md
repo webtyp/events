@@ -35,11 +35,12 @@ func (m *Module) create(item CatalogItem) {
 
 // A module that reacts depends on events.Subscriber only.
 func (m *Notifier) Init(sub events.Subscriber) {
-    sub.Subscribe(TopicItemCreated, func(e events.Event) {
+    subscription := sub.Subscribe(TopicItemCreated, func(e events.Event) {
         if item, ok := e.Payload.(*ItemCreated); ok {
             m.notify(item.Name)
         }
     })
+    // subscription.Cancel() stops delivery to this handler.
 }
 ```
 
@@ -52,8 +53,9 @@ declared it needs.
 - **`Event`**: `Topic string` + `Payload model.Encodable` — never `any`.
 - **`Handler`**: `func(Event)` — what a subscriber registers.
 - **`Publisher`**: `Publish(Event)` — fire-and-forget.
-- **`Subscriber`**: `Subscribe(topic string, h Handler)` — fan-out: every Subscribe on the same
+- **`Subscriber`**: `Subscribe(topic string, h Handler) Subscription` — fan-out: every Subscribe on the same
   topic receives the event.
+- **`Subscription`**: `Cancel()` — stops delivery to the handler of this registration.
 - **`Broker`**: `Publisher` + `Subscriber` — the full contract a composition root injects.
 - **`mock`**: the reference `Broker` — synchronous, in-process. Used both as the real
   module-to-module implementation inside a single binary and as the test double.

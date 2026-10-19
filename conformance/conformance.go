@@ -58,6 +58,11 @@ func Run(t *testing.T, f Factory) {
 	t.Run("multiple_subscribers_all_receive", func(t *testing.T) { fanOutToMultipleSubscribers(t, f) })
 	t.Run("payload_fields_survive_delivery", func(t *testing.T) { payloadFieldsSurviveDelivery(t, f) })
 	t.Run("publish_with_no_subscriber_does_not_block", func(t *testing.T) { publishWithNoSubscriberDoesNotBlock(t, f) })
+	t.Run("subscribe_returns_a_subscription", func(t *testing.T) { subscribeReturnsASubscription(t, f) })
+	t.Run("cancel_stops_delivery", func(t *testing.T) { cancelStopsDelivery(t, f) })
+	t.Run("cancel_is_idempotent", func(t *testing.T) { cancelIsIdempotent(t, f) })
+	t.Run("cancel_one_keeps_the_others", func(t *testing.T) { cancelOneKeepsTheOthers(t, f) })
+	t.Run("cancel_from_inside_a_handler", func(t *testing.T) { cancelFromInsideAHandler(t, f) })
 }
 
 func build(t *testing.T, f Factory) events.Broker {
@@ -181,5 +186,117 @@ func publishWithNoSubscriberDoesNotBlock(t *testing.T, f Factory) {
 	case <-done:
 	case <-time.After(waitFor):
 		t.Fatal("Publish with no subscriber did not return: the implementation blocks on delivery")
+	}
+}
+
+// subscribeReturnsASubscription: the returned value is not nil.
+func subscribeReturnsASubscription(t *testing.T, f Factory) {
+	b := build(t, f)
+	sub := b.Subscribe(TopicA, func(events.Event) {})
+	if sub == nil {
+		t.Fatal("Subscribe returned a nil Subscription")
+	}
+}
+
+// cancelStopsDelivery: publish → delivered; Cancel; publish again → not delivered.
+func cancelStopsDelivery(t *testing.T, f Factory) {
+	b := build(t, f)
+
+	got := make(chan events.Event, 2)
+	sub := b.Subscribe(TopicA, func(e events.Event) { got <- e })
+
+	b.Publish(events.Event{Topic: TopicA, Payload: &Fixture{Value: "first"}})
+	select {
+	case <-got:
+	case <-time.After(waitFor):
+		t.Fatal("first publish was not delivered")
+	}
+
+	sub.Cancel()
+
+	b.Publish(events.Event{Topic: TopicA, Payload: &Fixture{Value: "second"}})
+	b.Publish(events.Event{Topic: TopicB, Payload: &Fixture{Value: "sentinel"}})
+
+	// Wait a bit to ensure the second event was not delivered
+	select {
+	case e := <-got:
+		t.Fatalf("canceled subscription received an event: %+v", e)
+	case <-time.After(10 * time.Millisecond):
+		// Test passed
+	}
+}
+
+// cancelIsIdempotent: Cancel twice does not panic and changes nothing.
+func cancelIsIdempotent(t *testing.T, f Factory) {
+	b := build(t, f)
+
+	got := make(chan events.Event, 1)
+	sub := b.Subscribe(TopicA, func(e events.Event) { got <- e })
+
+	sub.Cancel()
+	sub.Cancel() // should not panic
+
+	b.Publish(events.Event{Topic: TopicA, Payload: &Fixture{Value: "test"}})
+
+	select {
+	case e := <-got:
+		t.Fatalf("canceled subscription received an event: %+v", e)
+	case <-time.After(10 * time.Millisecond):
+		// Test passed
+	}
+}
+
+// cancelOneKeepsTheOthers: two subscribers on one topic; cancel the first; the second still receives.
+func cancelOneKeepsTheOthers(t *testing.T, f Factory) {
+	b := build(t, f)
+
+	got1 := make(chan events.Event, 1)
+	got2 := make(chan events.Event, 1)
+
+	sub1 := b.Subscribe(TopicA, func(e events.Event) { got1 <- e })
+	b.Subscribe(TopicA, func(e events.Event) { got2 <- e })
+
+	sub1.Cancel()
+
+	b.Publish(events.Event{Topic: TopicA, Payload: &Fixture{Value: "test"}})
+
+	select {
+	case e := <-got1:
+		t.Fatalf("canceled subscription received an event: %+v", e)
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	select {
+	case <-got2:
+	case <-time.After(waitFor):
+		t.Fatal("second subscriber did not receive the event")
+	}
+}
+
+// cancelFromInsideAHandler: a handler that cancels its own subscription during delivery does not deadlock and is not called again.
+func cancelFromInsideAHandler(t *testing.T, f Factory) {
+	b := build(t, f)
+
+	got := make(chan events.Event, 2)
+	var sub events.Subscription
+	sub = b.Subscribe(TopicA, func(e events.Event) {
+		got <- e
+		sub.Cancel()
+	})
+
+	b.Publish(events.Event{Topic: TopicA, Payload: &Fixture{Value: "first"}})
+
+	select {
+	case <-got:
+	case <-time.After(waitFor):
+		t.Fatal("first publish was not delivered")
+	}
+
+	b.Publish(events.Event{Topic: TopicA, Payload: &Fixture{Value: "second"}})
+
+	select {
+	case e := <-got:
+		t.Fatalf("canceled subscription received a second event: %+v", e)
+	case <-time.After(10 * time.Millisecond):
 	}
 }

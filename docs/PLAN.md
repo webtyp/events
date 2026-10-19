@@ -3,8 +3,10 @@ PLAN: "feat!: events v0.1.0 — Subscribe returns a Subscription (Cancel); event
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 5483613891277724315
+PR: https://github.com/webtyp/events/pull/2
+REVIEWED_COMMIT: f7a89386d81aa08acfc0f0cc03cc5de306edf9eb
 ---
 
 > Read AGENTS.md at the repo root before any change.
