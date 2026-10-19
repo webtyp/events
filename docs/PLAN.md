@@ -6,7 +6,7 @@ REVIEWER: none
 STATUS: review
 SESSION: 5483613891277724315
 PR: https://github.com/webtyp/events/pull/2
-REVIEWED_COMMIT: 9f029fbae11d43c81b2c975a6d4b1852672df456
+REVIEWED_COMMIT: f7a89386d81aa08acfc0f0cc03cc5de306edf9eb
 ---
 
 > Read AGENTS.md at the repo root before any change.
