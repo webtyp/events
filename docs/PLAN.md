@@ -3,6 +3,8 @@ PLAN: "feat!: events v0.1.0 — Subscribe returns a Subscription (Cancel); event
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 5483613891277724315
 ---
 
 > Read AGENTS.md at the repo root before any change.
