@@ -35,12 +35,12 @@ func (m *Module) create(item CatalogItem) {
 
 // A module that reacts depends on events.Subscriber only.
 func (m *Notifier) Init(sub events.Subscriber) {
-    sub := sub.Subscribe(TopicItemCreated, func(e events.Event) {
+    subscription := sub.Subscribe(TopicItemCreated, func(e events.Event) {
         if item, ok := e.Payload.(*ItemCreated); ok {
             m.notify(item.Name)
         }
     })
-    // sub.Cancel() stops delivery to this handler.
+    // subscription.Cancel() stops delivery to this handler.
 }
 ```
 
