@@ -1,197 +1,127 @@
 ---
-PLAN: "feat: Fanout — one Publish reaches in-proc subscribers and a transport"
+PLAN: "feat!: events v0.1.0 — Subscribe returns a Subscription (Cancel); events is the ecosystem's one pub/sub package and webtyp/bus is retired"
+TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
 ---
 
-> This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
+> Read AGENTS.md at the repo root before any change.
 >
-> **GATE** for `app-demo`'s real-backend split. Orchestrator:
-> [webtyp/docs/AGENDA_DOMAIN_MASTER_PLAN.md](https://github.com/webtyp/webtyp/blob/main/docs/AGENDA_DOMAIN_MASTER_PLAN.md).
+> The previous content of this file (the `Fanout` plan) was already executed: `Fanout` is in `events.go`. It is replaced by this plan.
 
-# Plan — `events.Fanout`
+## Tools
 
-## 1. The gap
+```
+go install webtyp.com/devflow/cmd/gotest@latest
+```
 
-A server binary that runs domain modules has **two** audiences for the same
-event, and today no way to serve both from one `Publish`:
+## Why
 
-1. **Other modules in the same process.** `appointment_booking` subscribes to
-   `business.calendar.changed` to recompute conflicts. That delivery is
-   `events/mock.Broker`'s job — its own doc says so: *"It never crosses a
-   process boundary — that is webtyp.com/sse's job."*
-2. **The browser.** The same event must reach the WASM client so the view
-   reloads. That is `sse.Publisher`'s job — it already satisfies
-   `events.Publisher` (`var _ events.Publisher = Publisher{}`).
+The ecosystem has **two** pub/sub packages: `webtyp.com/events` (the contract, 20 dependent repos, an in-process `mock.Broker`,
+`sse` adapters, a conformance suite) and `webtyp.com/bus` (an unused second hub: **no repo imports it**). Two packages for one
+concern is exactly the duplication the ecosystem forbids. They are unified into `events`.
 
-A module takes **one** `events.Publisher` in its `Deps`. Wire the broker and the
-browser never hears; wire SSE and the in-process subscriber never fires. Today
-the only ways out are both wrong:
+## Ecosystem search (done before writing this plan)
 
-- **Give modules two publishers.** Every domain module's `Deps` grows a second
-  field that means "the same thing, but over there". The module would have to
-  know there are two audiences, which is exactly the coupling `events` exists to
-  remove.
-- **Bridge broker → SSE with a subscription.** `Subscriber.Subscribe(topic, h)`
-  is topic-exact; there is no wildcard. Every app would maintain a hand-written
-  list of topics to forward, and a new topic would silently stop reaching the
-  browser — a silent failure.
+| Found | What it offers | Decision |
+|---|---|---|
+| `webtyp/events` | `Event`, `Handler`, `Publisher`, `Subscriber`, `Broker`, `Fanout`; `events/mock` (synchronous in-process broker); `events/conformance` | **the one package** |
+| `webtyp/bus` | `Subscribe` returning a `Subscription` with `Cancel`; `Topics()`; `Close()`; asynchronous dispatch (a goroutine per handler); payload `binary.Message`. **No importer anywhere in `webtyp` or `veltylabs`** | **retired**; only what is useful moves |
+| `webtyp/sse` | `Publisher` and `Subscriber` adapters over `events` (`Subscriber` is `//go:build wasm`) | consumer; adapted in its own plan after this tag |
+| `webtyp/broker` | despite the bus doc's claim, an HTTP request mediator; unrelated | untouched |
+| `webtyp/outbox`, `webtyp/idempotency` | a browser offline mutation queue and an HTTP middleware; unrelated | untouched |
 
-## 2. Design gate
+What of `bus` is carried over, and what is not:
 
-New exported symbol. Per skill **api-design**:
+- **Carried: `Cancel`.** A component that subscribes while mounted and must stop when unmounted has no way to do it with
+  `events` today (a `Subscribe` registers for the life of the broker). That is a real need.
+- **Not carried: `Topics()`.** No consumer; introspection can be added when one exists.
+- **Not carried: `Close()`.** A broker's lifetime belongs to whoever built it; `Cancel` covers a single registration.
+- **Not carried: asynchronous dispatch.** `events` documents synchronous, in-order delivery (`mock.Broker`); a handler that
+  must not block starts its own goroutine. Two delivery semantics in one contract would be a trap.
+- **Not carried: `binary.Message` payloads.** The contract's payload is `model.Encodable`.
 
-### 2.1 Prior art
+## Design gate
 
-- **Go's `io.MultiWriter`** — the same shape for the same problem: one `Write`,
-  several sinks, errors from the first failure. `Fanout` is its `Publisher`
-  twin, minus the error (this contract is fire-and-forget by declaration).
-- **Watermill (Go)** — a `PublisherDecorator` chain; publishing to several
-  backends is composed at the router. Heavier than needed here because
-  Watermill also owns delivery guarantees, which `events` explicitly does not.
-- **Spring `ApplicationEventMulticaster`** — one publish, N listeners, in-proc
-  plus bridges. Same idea, an object graph instead of a slice.
+1. **Prior art.** (a) Node's `EventEmitter.on` returns the emitter, with `off`; RxJS `subscribe` returns a `Subscription` with
+   `unsubscribe()`; Go's `context.AfterFunc` returns a `stop` function; `os/signal.Notify`/`Stop`. The Go-idiomatic and
+   TinyGo-friendly form is a returned handle with one method. (b) The ecosystem's own `bus.Subscription` (`Cancel`) — the name is
+   adopted. It differs from RxJS in having no `closed` state to query: not needed.
+2. **Novice-name test.** `events.Subscription`, `Subscription.Cancel`. Read aloud: "subscribe, and keep the subscription so you
+   can cancel it".
+3. **Complexity ledger.**
+   ```
+   Concepts the developer must learn   +1 / −1   (Subscription added; "which bus do I use?" disappears)
+   Files they must touch to do X       +0 / −0
+   Lines at the call site              +0 / −0   (a caller that ignores the result compiles unchanged)
+   Ways to do the same thing           +0 / −1   (one pub/sub package, not two)
+   ```
+4. **Where it belongs.** Here: the contract owns its handle; implementers (`mock.Broker` here, `sse.Subscriber` in `sse`) adopt it.
+5. **What it deletes.** `Subscriber.Subscribe`'s old signature (breaking for implementers only: `mock.Broker` and `sse.Subscriber`;
+   every caller that ignores the result still compiles); and, outside this repo, the `webtyp/bus` package (see Stage 4).
 
-Why a slice type rather than a constructor: `events.Publisher` is a
-single-method interface and the composition is a list. `io.MultiWriter` returns
-an opaque value because it must close over the slice; a named slice type is
-simpler in Go, prints usefully, and lets a caller append.
-
-### 2.2 The novice-name test
-
-`events.Fanout{broker, ssePublisher}` — *"fan this out to the broker and to
-SSE."* Fan-out is the term the `mock.Broker` doc already uses ("synchronous,
-in-memory fan-out"), so it introduces no vocabulary.
-
-### 2.3 Complexity ledger
-
-| Row | Δ |
-|---|---|
-| Concepts the developer must learn | **0** — it *is* an `events.Publisher` |
-| Files touched to reach two audiences | **1** (the composition root) |
-| Lines at the call site | **+1** |
-| Ways to do the same thing | **−2** — the two-publishers-in-Deps workaround and the hand-listed topic bridge both stop being reachable |
-| Exported surface | **+1 type, +1 method** |
-
-### 2.4 Where it belongs
-
-`events` owns the pub/sub contract. Composing two `Publisher`s is that concern,
-and the package doc already frames itself as the place where "every module
-redeclared its own EventPublisher" was fixed. An app-local copy would be that
-regression.
-
-### 2.5 What it deletes
-
-Nothing today (no app has shipped either workaround). It **prevents** both, and
-it is what lets `app-demo` keep a single `Publisher` per module.
-
-## 3. Stage 1 — the type
-
-**File: `events.go`** — beside `Publisher`, so the two read together.
+## Stage 1 — the contract (`events.go`)
 
 ```go
-// Fanout publishes one Event to every Publisher it holds, in order. It is
-// itself a Publisher, so a module still takes exactly one.
-//
-// It exists because a server binary has two audiences for the same event: the
-// modules in its own process (mock.Broker) and the browser (sse.Publisher).
-// Without it a module would need two Publisher fields — it would have to know
-// there are two audiences, which is the coupling this package removes.
-//
-// Delivery follows the Publisher contract: fire-and-forget, no ordering or
-// delivery promise beyond "every Publisher in the slice is called". A nil
-// entry is skipped, so an optional transport can be composed without a guard
-// at the call site.
-type Fanout []Publisher
-
-func (f Fanout) Publish(e Event) {
-	for _, p := range f {
-		if p != nil {
-			p.Publish(e)
-		}
-	}
+// Subscription is the handle of one Subscribe call.
+type Subscription interface {
+	// Cancel stops delivery to the handler of this registration. It is idempotent and safe to call from inside a handler.
+	// A Cancel that returns before a Publish starts guarantees the handler is not called by that Publish; a Publish already
+	// running may still deliver once.
+	Cancel()
 }
 
-var _ Publisher = Fanout(nil)
+type Subscriber interface {
+	Subscribe(topic string, h Handler) Subscription
+}
 ```
 
-**A panicking Publisher is not recovered.** That matches `mock.Broker`, whose
-doc states a broken subscriber must fail loudly rather than be silently dropped.
-Do **not** add a `recover()` — it would turn a broken transport into an event
-nobody notices.
+Update the doc comments of `Subscriber` and `Broker` accordingly. Nothing else in the contract changes (`Fanout` stays).
 
-**Nil entries are skipped, but a nil `Fanout` is a valid no-op Publisher** —
-ranging over a nil slice iterates zero times. That is deliberate: it lets a
-config pass `Fanout` unconditionally.
+## Stage 2 — `mock.Broker` (`mock/broker.go`)
 
-## 4. Stage 2 — tests
+- Each registration gets an increasing id (`uint32`, kept in the broker under its mutex). The stored handler entry becomes
+  `{id, h}`. `Subscribe` returns a `*subscription` whose `Cancel` removes that entry by id under the broker's mutex; a second
+  `Cancel` does nothing. Keep slices (no `map`), keep `Publish` copying the handler list under the lock and calling outside it
+  (so a handler may call `Cancel` or `Subscribe` without deadlock).
+- `var _ events.Broker = (*Broker)(nil)` stays.
 
-**File: `events_test.go`** (extend it; do not add a second file for one type).
+## Stage 3 — conformance and tests
 
-```go
-// Fanout delivers to every Publisher, in slice order.
-func TestFanoutDeliversToEveryPublisherInOrder(t *testing.T)
+**`conformance/conformance.go`**: add these clauses to `Run` (same style as the existing ones; the helper types stay):
+- `subscribe_returns_a_subscription`: the returned value is not nil.
+- `cancel_stops_delivery`: publish → delivered; `Cancel`; publish again → not delivered.
+- `cancel_is_idempotent`: `Cancel` twice does not panic and changes nothing.
+- `cancel_one_keeps_the_others`: two subscribers on one topic; cancel the first; the second still receives.
+- `cancel_from_inside_a_handler`: a handler that cancels its own subscription during delivery does not deadlock and is not
+  called again.
 
-// A nil entry is skipped, so an optional transport composes without a guard.
-func TestFanoutSkipsNilPublishers(t *testing.T)
+**`tests/`**: search first (`tests/broker_test.go`, `conformance_test.go`, `consumer_test.go`, `fanout_test.go` exist) and **extend**
+them; do not add a duplicate. The mock must pass the extended conformance suite. `consumer_test.go` gains one case showing that a
+subscriber module holding only `events.Subscriber` can cancel.
 
-// A nil Fanout is a valid no-op Publisher.
-func TestNilFanoutPublishesNothing(t *testing.T)
+## Stage 4 — docs
 
-// The consumer-shaped case this exists for: one Publish reaches an in-proc
-// subscriber AND a transport double.
-func TestFanoutReachesBrokerSubscriberAndTransport(t *testing.T)
+- `README.md`: the Quick Start keeps its shape and gains a three-line `Cancel` example; the **Contracts** list gains `Subscription`.
+- New `docs/ARCHITECTURE.md`: the contract in one page, synchronous in-order delivery, the two audiences (`Fanout`), and a section
+  **"Why there is no bus"** with the carried / not carried list of this plan's «Ecosystem search» (without linking this plan).
+- Permanent docs never link `docs/PLAN.md`.
+
+## Delivery check
+
+```
+gotest                                                          # vet, race, tests and wasm green
+GOOS=js GOARCH=wasm go vet ./...
+gofmt -l .                                                      # → empty
+grep -rn "Subscribe(topic string, h Handler)$" events.go       # → empty (the old signature is gone)
+git diff --stat main                                            # only the files of the stages
 ```
 
-The last one is the publication rule from skill **api-design**: a
-consumer-shaped test, inside the library, through the real stack — a real
-`mock.Broker` with a real `Subscribe`, and a recording `Publisher` standing in
-for the transport.
+## Stages table
 
-Use `webtyp.com/fmt`, never stdlib `errors`/`strings`. `testing` is the only
-stdlib import allowed here, as elsewhere in this repo.
-
-## 5. Stage 3 — docs
-
-`README.md` gains a short "Two audiences" section showing the composition:
-
-```go
-pub := events.Fanout{broker, sse.Publisher{Server: sseSrv}}
-mod, err := appointmentbooking.New(db, appointmentbooking.Deps{
-    Publisher:  pub,     // reaches both
-    Subscriber: broker,  // in-proc only, by definition
-})
-```
-
-State plainly that **`Subscriber` is always the broker**: SSE is one-way
-(server→browser) and cannot deliver to an in-process handler. That asymmetry is
-the thing a reader gets wrong first.
-
-## 6. Constraints
-
-- **No stdlib** beyond `testing` in `_test.go`: `webtyp.com/fmt`.
-- **No `map`**, no new import. This is a slice and a loop.
-- This package compiles to WASM; keep it allocation-free on the hot path.
-- **No `recover()`** (§3).
-- **No `TODO`, nothing deprecated.** Before closing:
-  `grep -rn "TODO\|FIXME\|Deprecated" --include='*.go' .`
-- `gotest`, never `go test`.
-
-## 7. Acceptance criteria
-
-| # | Check | Expected |
-|---|-------|----------|
-| 1 | `gotest ./...` | green, the four tests in §4 present |
-| 2 | `grep -n "var _ Publisher = Fanout" events.go` | present |
-| 3 | `grep -n "recover()" events.go` | **empty** |
-| 4 | `grep -rn "\"errors\"\|\"strconv\"\|\"strings\"" --include='*.go' .` | **empty** |
-| 5 | `GOOS=js GOARCH=wasm go build ./...` | compiles |
-| 6 | `grep -rn "TODO\|FIXME\|Deprecated" --include='*.go' .` | no hit introduced here |
-
-## 8. Stages
-
-| # | Stage | Files | Done when |
-|---|-------|-------|-----------|
-| 1 | The type | `events.go` | `Fanout` + `var _ Publisher` |
-| 2 | Tests | `events_test.go` | §4 complete, including the consumer-shaped case |
-| 3 | Docs | `README.md` | the "Two audiences" section, and the Subscriber asymmetry |
+| # | Stage | Files |
+|---|---|---|
+| 1 | the contract | `events.go` |
+| 2 | the in-process broker | `mock/broker.go` |
+| 3 | conformance and tests | `conformance/conformance.go`, `tests/broker_test.go`, `tests/consumer_test.go`, `tests/conformance_test.go` |
+| 4 | docs | `README.md`, `docs/ARCHITECTURE.md` |
