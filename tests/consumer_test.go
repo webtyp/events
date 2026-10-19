@@ -60,3 +60,43 @@ func TestConsumer_ModuleToModule(t *testing.T) {
 		t.Fatal("the subscriber module never received the publisher module's event")
 	}
 }
+
+// TestConsumer_Cancel shows that a subscriber module holding only events.Subscriber
+// can capture the Subscription and call Cancel.
+func TestConsumer_Cancel(t *testing.T) {
+	broker := &mock.Broker{}
+	var sub events.Subscriber = broker
+	var pub events.Publisher = broker
+
+	received := make(chan *itemCreated, 2)
+	subscription := sub.Subscribe(topicItemCreated, func(e events.Event) {
+		if item, ok := e.Payload.(*itemCreated); ok {
+			received <- item
+		}
+	})
+
+	pub.Publish(events.Event{
+		Topic:   topicItemCreated,
+		Payload: &itemCreated{ID: "first", Name: "First"},
+	})
+
+	select {
+	case <-received:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first event not received")
+	}
+
+	subscription.Cancel()
+
+	pub.Publish(events.Event{
+		Topic:   topicItemCreated,
+		Payload: &itemCreated{ID: "second", Name: "Second"},
+	})
+
+	select {
+	case <-received:
+		t.Fatal("received event after cancellation")
+	case <-time.After(10 * time.Millisecond):
+		// Success
+	}
+}

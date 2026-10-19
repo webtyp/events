@@ -44,10 +44,18 @@ type Publisher interface {
 	Publish(e Event)
 }
 
+// Subscription is the handle of one Subscribe call.
+type Subscription interface {
+	// Cancel stops delivery to the handler of this registration. It is idempotent and safe to call from inside a handler.
+	// A Cancel that returns before a Publish starts guarantees the handler is not called by that Publish; a Publish already
+	// running may still deliver once.
+	Cancel()
+}
+
 // Subscriber registers a Handler for a topic. Multiple Subscribe calls on the same
 // topic all receive the event (fan-out).
 type Subscriber interface {
-	Subscribe(topic string, h Handler)
+	Subscribe(topic string, h Handler) Subscription
 }
 
 // Broker is the full contract a composition root wires in: publish and subscribe
