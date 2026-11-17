@@ -20,7 +20,7 @@
 ## This repo
 
 - **The one pub/sub contract of the ecosystem** (`Event`, `Handler`, `Publisher`, `Subscriber`, `Subscription`, `Broker`, `Fanout`). There is no second pub/sub package: `webtyp/bus` is retired. A feature a consumer needs is added here, never in a parallel package.
-- The contract is **delivery-agnostic**: `mock.Broker` is synchronous and in-order and is the reference; a broker that is asynchronous or crosses a wire (`webtyp/sse`) must still pass `conformance.Run`.
+- The contract is **delivery-agnostic**: `inprocess.Broker` is synchronous and in-order and is the reference; a broker that is asynchronous or crosses a wire (`webtyp/sse`) must still pass `conformance.Run`.
 - The root package, `mock` and `conformance` compile to both WASM and native: no `map` (slices), no `reflect`, no stdlib `errors`/`strings`/`strconv`/`fmt`.
 - A `Handler` that panics is **not** recovered: a broken subscriber must fail loudly.
 - Payloads are `model.Encodable`, never `any`. A topic is a typed constant exported by the module that publishes it.

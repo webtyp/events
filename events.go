@@ -59,7 +59,7 @@ type Subscriber interface {
 }
 
 // Broker is the full contract a composition root wires in: publish and subscribe
-// together. Implementations: webtyp.com/events/mock (in-process, for
+// together. Implementations: webtyp.com/events/inprocess (in-process, for
 // module-to-module delivery and tests) and webtyp.com/sse (push to the
 // browser).
 type Broker interface {
@@ -71,7 +71,7 @@ type Broker interface {
 // itself a Publisher, so a module still takes exactly one.
 //
 // It exists because a server binary has two audiences for the same event: the
-// modules in its own process (mock.Broker) and the browser (webtyp.com/sse).
+// modules in its own process (inprocess.Broker) and the browser (webtyp.com/sse).
 // Without it a module would need two Publisher fields — it would have to know
 // there are two audiences, which is the coupling this package removes.
 //

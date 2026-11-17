@@ -9,7 +9,7 @@
 // An implementation proves conformance from its own test package:
 //
 //	func TestMockConformance(t *testing.T) {
-//	    conformance.Run(t, conformance.Factory{New: func(t *testing.T) events.Broker { return &mock.Broker{} }})
+//	    conformance.Run(t, conformance.Factory{New: func(t *testing.T) events.Broker { return &inprocess.Broker{} }})
 //	}
 package conformance
 

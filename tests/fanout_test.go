@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"webtyp.com/events"
-	"webtyp.com/events/mock"
+	"webtyp.com/events/inprocess"
 )
 
 // recordingPublisher stands in for a transport (e.g. webtyp.com/sse) — it only
@@ -51,10 +51,10 @@ func TestNilFanoutPublishesNothing(t *testing.T) {
 }
 
 // The consumer-shaped case this exists for: one Publish reaches an in-proc
-// subscriber (through mock.Broker) AND a transport double, simultaneously —
+// subscriber (through inprocess.Broker) AND a transport double, simultaneously —
 // the two audiences a server binary has for the same event.
 func TestFanoutReachesBrokerSubscriberAndTransport(t *testing.T) {
-	broker := &mock.Broker{}
+	broker := &inprocess.Broker{}
 	transport := &recordingPublisher{}
 	f := events.Fanout{broker, transport}
 

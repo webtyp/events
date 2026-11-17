@@ -67,7 +67,7 @@ declared it needs.
 ## Two audiences
 
 A server binary usually has **two** audiences for the same event: the other modules in its own
-process (`mock.Broker`), and the browser (`webtyp.com/sse`). A module still takes exactly one
+process (`inprocess.Broker`), and the browser (`webtyp.com/sse`). A module still takes exactly one
 `Publisher` — compose the two with `Fanout`:
 
 ```go
@@ -88,7 +88,7 @@ composition root can build one unconditionally, transport included or not.
 ## Design
 
 An event's `Payload` travels as the concrete Go value the publisher built. An in-process broker
-(`mock.Broker`) delivers it as-is — no serialization. A broker that crosses a real wire
+(`inprocess.Broker`) delivers it as-is — no serialization. A broker that crosses a real wire
 (`webtyp.com/sse`, pushing to a browser) encodes `Payload` via its own `EncodeFields`
 when it needs to; that is the broker's concern, never the contract's or the module's.
 

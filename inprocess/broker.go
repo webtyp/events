@@ -1,7 +1,7 @@
-// Package mock is the canonical in-process events.Broker: synchronous, in-memory
+// Package inprocess is the canonical in-process events.Broker: synchronous, in-memory
 // fan-out. It is both the reference implementation module-to-module delivery uses
 // in a single binary, and the test double consumers wire in place of a real broker.
-package mock
+package inprocess
 
 import (
 	"sync"

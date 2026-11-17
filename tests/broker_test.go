@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"webtyp.com/events"
-	"webtyp.com/events/mock"
+	"webtyp.com/events/inprocess"
 )
 
 func TestBroker_MultipleTopics_ScopedDelivery(t *testing.T) {
-	b := &mock.Broker{}
+	b := &inprocess.Broker{}
 
 	var recA, recB []string
 	b.Subscribe("topic.a", func(e events.Event) {
@@ -30,7 +30,7 @@ func TestBroker_MultipleTopics_ScopedDelivery(t *testing.T) {
 }
 
 func TestBroker_OrderPreserved(t *testing.T) {
-	b := &mock.Broker{}
+	b := &inprocess.Broker{}
 
 	var order []int
 	b.Subscribe("topic.seq", func(e events.Event) {
@@ -51,7 +51,7 @@ func TestBroker_OrderPreserved(t *testing.T) {
 }
 
 func TestBroker_ConcurrentPublish_NoRace(t *testing.T) {
-	b := &mock.Broker{}
+	b := &inprocess.Broker{}
 
 	var wg sync.WaitGroup
 

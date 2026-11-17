@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"webtyp.com/events"
-	"webtyp.com/events/mock"
+	"webtyp.com/events/inprocess"
 	"webtyp.com/model"
 )
 
@@ -33,7 +33,7 @@ const topicItemCreated = "catalog.item.created"
 func TestConsumer_ModuleToModule(t *testing.T) {
 	// The composition root's job: one concrete broker, injected as two different,
 	// narrower contracts.
-	broker := &mock.Broker{}
+	broker := &inprocess.Broker{}
 	var pub events.Publisher = broker
 	var sub events.Subscriber = broker
 
@@ -64,7 +64,7 @@ func TestConsumer_ModuleToModule(t *testing.T) {
 // TestConsumer_Cancel shows that a subscriber module holding only events.Subscriber
 // can capture the Subscription and call Cancel.
 func TestConsumer_Cancel(t *testing.T) {
-	broker := &mock.Broker{}
+	broker := &inprocess.Broker{}
 	var sub events.Subscriber = broker
 	var pub events.Publisher = broker
 

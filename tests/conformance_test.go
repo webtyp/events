@@ -5,7 +5,7 @@ import (
 
 	"webtyp.com/events"
 	"webtyp.com/events/conformance"
-	"webtyp.com/events/mock"
+	"webtyp.com/events/inprocess"
 )
 
 // TestMockConformance holds the reference in-process broker to the same contract
@@ -13,6 +13,6 @@ import (
 // router/conformance.
 func TestMockConformance(t *testing.T) {
 	conformance.Run(t, conformance.Factory{
-		New: func(t *testing.T) events.Broker { return &mock.Broker{} },
+		New: func(t *testing.T) events.Broker { return &inprocess.Broker{} },
 	})
 }
